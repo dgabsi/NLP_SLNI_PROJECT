@@ -6,7 +6,7 @@ import params
 
 class Basic_RNN(nn.Module):
 
-    def __init__(self, vocab, device, num_classes=3, hidden_size=512, embeddings_dim=300, hidden_linear_dim=256, use_pretrained_embeddings=False, dropout_rate=0.1):
+    def __init__(self, vocab, device, num_classes=3, hidden_size=512, embeddings_dim=300, hidden_pre2_classifier_linear_dim=256,  hidden_pre1_classifier_linear_dim=64, use_pretrained_embeddings=False, pad_token='<pad>',dropout_rate=0.1):
 
         super(Basic_RNN, self).__init__()
 
@@ -14,26 +14,27 @@ class Basic_RNN(nn.Module):
         self.vocabulary_size = len(vocab)
         self.device=device
         self.hidden_size=hidden_size
-        self.hidden_linear_dim=hidden_linear_dim
+        self.hidden_pre2_classifier_linear_dim=hidden_pre2_classifier_linear_dim
+        self.hidden_pre1_classifier_linear_dim = hidden_pre1_classifier_linear_dim
 
 
-        self.embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[params.PAD_TOKEN])
+        self.embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[pad_token])
 
         if use_pretrained_embeddings:
-            self.embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[params.PAD_TOKEN])
+            self.embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[pad_token])
 
         self.dropout = nn.Dropout(dropout_rate)
 
         self.lstm=nn.LSTM(input_size=self.embedding_size, hidden_size=self.hidden_size, bidirectional=True, batch_first=True, num_layers=2)
         self.pool = nn.AdaptiveAvgPool1d(1)
 
-        self.linear_pre2_classifier = nn.Linear(self.hidden_size * 2, hidden_linear_dim)
-        self.bn_pre2_classifier = nn.BatchNorm1d(hidden_linear_dim)
+        self.linear_pre2_classifier = nn.Linear(self.hidden_size * 2, self.hidden_pre2_classifier_linear_dim)
+        self.bn_pre2_classifier = nn.BatchNorm1d(self.hidden_pre2_classifier_linear_dim)
         self.lrelu2=nn.LeakyReLU()
-        self.linear_pre1_classifier = nn.Linear(hidden_linear_dim, 64)
-        self.bn_pre1_classifier = nn.BatchNorm1d(64)
+        self.linear_pre1_classifier = nn.Linear(self.hidden_pre2_classifier_linear_dim, self.hidden_pre1_classifier_linear_dim)
+        self.bn_pre1_classifier = nn.BatchNorm1d(self.hidden_pre1_classifier_linear_dim)
         self.lrelu1 = nn.LeakyReLU()
-        self.classifier=nn.Linear(64, num_classes)
+        self.classifier=nn.Linear(self.hidden_pre1_classifier_linear_dim, num_classes)
 
     def forward(self, inputs, attention_padding_mask=None):
 

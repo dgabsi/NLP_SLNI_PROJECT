@@ -10,15 +10,17 @@ import time
 from torch.utils import data
 import os
 import utils
-
+import time
+import datetime
+import params
 
 def train_snli(model, train_dataset,val_dataset, device, model_name, config, writer, models_dir, checkpoint_file=None):
 
 
-    train_dataloader_args = {'batch_size': config["batch_size"], 'shuffle': False, 'collate_fn': train_dataset.collate_fun}
+    train_dataloader_args = {'batch_size': params.BATCH_SIZE, 'shuffle': False, 'collate_fn': train_dataset.collate_fun}
     train_dataloader = data.DataLoader(train_dataset, **train_dataloader_args)
 
-    val_dataloader_args = {'batch_size': config["batch_size"], 'shuffle': False, 'collate_fn': val_dataset.collate_fun}
+    val_dataloader_args = {'batch_size': params.BATCH_SIZE, 'shuffle': False, 'collate_fn': val_dataset.collate_fun}
     val_dataloader = data.DataLoader(val_dataset, **val_dataloader_args)
 
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
@@ -26,17 +28,15 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
 
     criterion = nn.CrossEntropyLoss()
 
-    history = {'Epoch': [], 'Train loss': [], 'Val loss':[], 'Val accuracy': [] }
-
-    results_dict = {}
+    history = {'Epoch': [], 'Train loss': [], 'Val loss':[], 'Val accuracy': [] , 'Train iter':[], 'Val iter':[]}
 
 
     train_iter_start = 0
     val_iter_start = 0
-    epoch_end=0
+    epoch_start=0
 
     if checkpoint_file:
-        model_state, optimizer_state, epoch_start, epoch_end, train_iter_start, val_iter_start=utils.load_model(models_dir, checkpoint_file)
+        model_state, optimizer_state, epoch_start,train_iter_start, val_iter_start=utils.load_model(models_dir, checkpoint_file)
         model.load_state_dict(model_state)
         optimizer.load_state_dict(optimizer_state)
 
@@ -47,7 +47,7 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
 
     num_epochs=config['num_epochs']
 
-    for epoch in range(num_epochs):
+    for epoch in range(1, num_epochs+1):
         epoch_train_loss = 0
         epoch_val_loss = 0
         val_corrects=0
@@ -89,9 +89,8 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
 
             writer.add_scalar('Training running loss', loss.item(), num_iters_train+train_iter_start)
             if not num_iters_train%1000:
-                nums_step_in_epochs=(num_iters_train//(epoch+1))
                 print(
-                    f"Step {num_iters_train}/{len(train_dataloader)*num_epochs} Train running loss: {epoch_train_loss/(nums_step_in_epochs):.2f}")
+                    f"Step {num_iters_train}/{len(train_dataloader)*num_epochs} Train running loss: {loss.item():.2f}")
             #print(f"Batch{train_batch}/{epoch} Train loss: {loss.item():.2f}")
 
             #print(f"End batch {time.time()}")
@@ -125,7 +124,7 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
             loss = criterion(outputs_logits, labels)
             epoch_val_loss += loss.item()
             outputs = torch.argmax(F.softmax(outputs_logits, dim=1),dim=1)
-            val_batch_correct=torch.sum((outputs==labels).to(float))
+            val_batch_correct=torch.sum((outputs==labels).to(float)).item()
             val_corrects += val_batch_correct
 
             num_iters_val += 1
@@ -143,32 +142,28 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
         #print(model(example_inputs,example_attention_padding_mas,example_token_type_ids))
         #print(evaluation.generate_response(model, 'sotuser I need a train from cambridge to norwich please. eotuser', vocab, device))
         epoch_val_loss = epoch_val_loss / len(val_dataloader)
-        epoch_val_accuracy = val_corrects * 100. / len(val_dataset)
-        print(f"Epoch{epoch}/{num_epochs} Train loss: {epoch_train_loss:.2f}, Val loss: {epoch_val_loss:.2f}  Val accuracy: {epoch_val_accuracy:.2f}  ")
+        epoch_val_accuracy = (val_corrects * 100. / len(val_dataset))
 
-        writer.add_scalar('Training loss', epoch_train_loss, epoch+epoch_end)
-        writer.add_scalar('Validation loss', epoch_val_loss, epoch+epoch_end)
-        writer.add_scalar('Val accuracy', epoch_val_accuracy, epoch+epoch_end)
+        print('*********************************************************************************')
+        print(f"{model_name} Epoch{epoch+epoch_start}/{num_epochs+epoch_start} Train loss: {epoch_train_loss:.2f}, Val loss: {epoch_val_loss:.2f}  Val accuracy: {epoch_val_accuracy:.2f}  Run params:{config['run_name']}")
+        print('*********************************************************************************')
 
-        history['Epoch'].append(epoch)
+        writer.add_scalar('Training loss', epoch_train_loss, epoch+epoch_start)
+        writer.add_scalar('Validation loss', epoch_val_loss, epoch+epoch_start)
+        writer.add_scalar('Val accuracy', epoch_val_accuracy, epoch+epoch_start)
+
+        history['Epoch'].append(epoch+epoch_start)
         history['Train loss'].append(epoch_train_loss)
         history['Val loss'].append(epoch_val_loss)
         history['Val accuracy'].append(epoch_val_accuracy)
-
-    results_dict['train loss'] = history['Train loss'][-1]
-    results_dict['val loss'] = history['Val loss'][-1]
-    results_dict['val accuracy'] = history['Val accuracy'][-1]
-    results_dict['epochs'] = num_epochs+epoch_end
-    results_dict['history'] = history
-
-    epoch_start=epoch_end
-    epoch_end=num_epochs+epoch_end
-    train_end_step=num_iters_train+train_iter_start
-    val_end_step=num_iters_val+val_iter_start
-
-    file_name=model_name+config['run_name']+' '+ str(epoch_end)
-    utils.save_model(model, optimizer, models_dir, file_name, epoch_start, epoch_end, train_end_step, val_end_step)
+        history['Train iter'].append(train_iter_start+num_iters_train)
+        history['Val iter'].append(val_iter_start+num_iters_val)
 
 
-    return results_dict
+        date_str = datetime.datetime.now().strftime("%m%d%Y %H")
+        file_name = model_name+ config['run_name']+' ' +' epoch:'+str(epoch+epoch_start)+' train_iter:'+str(train_iter_start+num_iters_train)+' val_iter:'+str(val_iter_start+num_iters_val)+date_str
+        utils.save_model(model, optimizer, models_dir, file_name, epoch+epoch_start, train_iter_start+num_iters_train, val_iter_start+num_iters_val )
+
+
+    return history
 

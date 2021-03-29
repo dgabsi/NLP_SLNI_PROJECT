@@ -6,7 +6,7 @@ import params
 
 class RNN_Combined_Model(nn.Module):
 
-    def __init__(self, vocab, device, num_classes=3, hidden_size=512, attention_dim=256, embeddings_dim=300, use_pretrained_embeddings=False, dropout_rate=0.1):
+    def __init__(self, vocab, device, num_classes=3, hidden_size=512, attention_dim=256, embeddings_dim=300, linear_pre_1dim=32, linear_pre_2dim=64, pad_token='<pad>', use_pretrained_embeddings=False, dropout_rate=0.1):
 
         super(RNN_Combined_Model, self).__init__()
 
@@ -16,12 +16,12 @@ class RNN_Combined_Model(nn.Module):
         self.device=device
 
 
-        self.sentence1_embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[params.PAD_TOKEN])
-        self.sentence2_embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[params.PAD_TOKEN])
+        self.sentence1_embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[pad_token])
+        self.sentence2_embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[pad_token])
 
         if use_pretrained_embeddings:
-            self.sentence1_embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[params.PAD_TOKEN])
-            self.sentence2_embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[params.PAD_TOKEN])
+            self.sentence1_embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[pad_token])
+            self.sentence2_embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[pad_token])
 
         self.sentence1_dropout = nn.Dropout(dropout_rate)
         self.sentence2_dropout = nn.Dropout(dropout_rate)
@@ -36,13 +36,13 @@ class RNN_Combined_Model(nn.Module):
         self.pool = nn.AdaptiveAvgPool1d(1)
         self.pool1 = nn.AdaptiveMaxPool1d(1)
 
-        self.linear_pre2_classifier=nn.Linear(attention_dim,64)
-        self.bn_pre2_classifier=nn.BatchNorm1d(64)
+        self.linear_pre2_classifier=nn.Linear(attention_dim,linear_pre_2dim)
+        self.bn_pre2_classifier=nn.BatchNorm1d(linear_pre_2dim)
         self.lrelu2 = nn.LeakyReLU()
-        self.linear_pre1_classifier=nn.Linear(64, 32)
-        self.bn_pre1_classifier = nn.BatchNorm1d(32)
+        self.linear_pre1_classifier=nn.Linear(linear_pre_2dim, linear_pre_1dim)
+        self.bn_pre1_classifier = nn.BatchNorm1d(linear_pre_1dim)
         self.lrelu1 = nn.LeakyReLU()
-        self.classifier=nn.Linear(32, num_classes)
+        self.classifier=nn.Linear(linear_pre_1dim, num_classes)
 
     def forward(self, inputs_1, inputs_2):
         sentence1_embedded=self.sentence1_dropout(self.sentence1_embedding(inputs_1))

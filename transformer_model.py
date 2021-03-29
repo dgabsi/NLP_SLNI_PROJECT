@@ -6,21 +6,22 @@ import params
 
 class SNLI_Transformer(nn.Module):
 
-    def __init__(self, vocab, device, num_classes=3, hidden_linear_dim=256, embeddings_dim=300,  num_heads=4, num_enc_layers=6, dropout_rate=0.1, use_pretrained_embeddings=False):
+    def __init__(self, vocab, device, num_classes=3, max_len=1000, hidden_pre2_classifier_linear_dim=256,  hidden_pre1_classifier_linear_dim=64, embeddings_dim=300,  num_heads=4, num_enc_layers=6, dropout_rate=0.1, use_pretrained_embeddings=False):
 
         super(SNLI_Transformer, self).__init__()
 
         self.embedding_size =  (embeddings_dim if not use_pretrained_embeddings else vocab.vectors.shape[1])
         self.vocabulary_size = len(vocab)
         self.device=device
-        self.hidden_linear_dim=hidden_linear_dim
+        self.hidden_pre2_classifier_linear_dim=hidden_pre2_classifier_linear_dim
+        self.hidden_pre1_classifier_linear_dim = hidden_pre1_classifier_linear_dim
 
         self.embedding = nn.Embedding(self.vocabulary_size, self.embedding_size)
 
         if use_pretrained_embeddings:
             self.embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[params.PAD_TOKEN])
 
-        self.pos_encoder = PositionalEncoding(device,embeddings_dim, dropout_rate)
+        self.pos_encoder = PositionalEncoding(device,embeddings_dim,max_len)
 
         self.dropout = nn.Dropout(dropout_rate)
 
@@ -30,13 +31,13 @@ class SNLI_Transformer(nn.Module):
         self.pool = nn.AdaptiveAvgPool1d(1)
         #self.gru=nn.GRU(self.embedding_size, hidden_size=200, batch_first=True, bidirectional=True)
 
-        self.linear_pre2_classifier=nn.Linear(self.embedding_size,hidden_linear_dim)
-        self.bn_pre2_classifier = nn.BatchNorm1d(hidden_linear_dim)
+        self.linear_pre2_classifier=nn.Linear(self.embedding_size,self.hidden_pre2_classifier_linear_dim)
+        self.bn_pre2_classifier = nn.BatchNorm1d(self.hidden_pre2_classifier_linear_dim)
         self.lrelu2 = nn.LeakyReLU()
-        self.linear_pre1_classifier = nn.Linear(hidden_linear_dim, 64)
-        self.bn_pre1_classifier = nn.BatchNorm1d(64)
+        self.linear_pre1_classifier = nn.Linear(self.hidden_pre2_classifier_linear_dim, self.hidden_pre1_classifier_linear_dim)
+        self.bn_pre1_classifier = nn.BatchNorm1d(self.hidden_pre1_classifier_linear_dim)
         self.lrelu1 = nn.LeakyReLU()
-        self.classifier = nn.Linear(64, num_classes)
+        self.classifier = nn.Linear(self.hidden_pre1_classifier_linear_dim, num_classes)
 
 
     def forward(self, inputs, attention_padding_mask):
@@ -67,7 +68,7 @@ class SNLI_Transformer(nn.Module):
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, device, embedding_size, max_len=500):
+    def __init__(self, device, embedding_size, max_len=1000):
         super(PositionalEncoding, self).__init__()
         self.pos_embed=nn.Embedding(max_len,embedding_size)
         self.device=device
