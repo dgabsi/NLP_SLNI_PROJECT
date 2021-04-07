@@ -5,8 +5,12 @@ import torch.nn.functional as F
 import params
 
 class SNLI_Transformer(nn.Module):
+    '''
+    Transformer encoder. Transformer Encoder layers with multiple heads and layers, followed by Adaptive pooling
+    to averages the sequence results and 2 linear layers with LeakyRelu activations and batchNorm, output is logits with number of classes
+    '''
 
-    def __init__(self, vocab, device, num_classes=3, max_len=1000, hidden_pre2_classifier_linear_dim=256,  hidden_pre1_classifier_linear_dim=64, embeddings_dim=300,  num_heads=4, num_enc_layers=6, dropout_rate=0.1, use_pretrained_embeddings=False):
+    def __init__(self, vocab, device, num_classes=3, max_len=1000, hidden_pre2_classifier_linear_dim=256,  hidden_pre1_classifier_linear_dim=64, embeddings_dim=300,  num_heads=4, num_enc_layers=6, dropout_rate=0.1, use_pretrained_embeddings=True):
 
         super(SNLI_Transformer, self).__init__()
 
@@ -33,10 +37,10 @@ class SNLI_Transformer(nn.Module):
 
         self.linear_pre2_classifier=nn.Linear(self.embedding_size,self.hidden_pre2_classifier_linear_dim)
         self.bn_pre2_classifier = nn.BatchNorm1d(self.hidden_pre2_classifier_linear_dim)
-        self.lrelu2 = nn.LeakyReLU()
+        self.relu2 = nn.ReLU()
         self.linear_pre1_classifier = nn.Linear(self.hidden_pre2_classifier_linear_dim, self.hidden_pre1_classifier_linear_dim)
         self.bn_pre1_classifier = nn.BatchNorm1d(self.hidden_pre1_classifier_linear_dim)
-        self.lrelu1 = nn.LeakyReLU()
+        self.relu1 = nn.ReLU()
         self.classifier = nn.Linear(self.hidden_pre1_classifier_linear_dim, num_classes)
 
 
@@ -45,7 +49,10 @@ class SNLI_Transformer(nn.Module):
         batch_size=inputs.size(0)
         #print(self.positional_encoding(inputs.size(1)).expand(batch_size, -1, -1).size())
         embedded_inputs=self.embedding(inputs)
-        embedded_inputs=self.pos_encoder(embedded_inputs)
+        embedded_inputs=self.dropout(self.pos_encoder(embedded_inputs))
+
+
+        #embedded_inputs=embedded_inputs+sentences_mask
         #embedded_inputs=self.pos_encoder(embedded_inputs)
         #embedded_inputs=self.dropout(self.embedding(inputs)+self.positional_encoding(inputs.size(1)).expand(batch_size, -1, -1))
         embedded_inputs=embedded_inputs.transpose(0,1)
@@ -55,8 +62,8 @@ class SNLI_Transformer(nn.Module):
         #gru_outputs, _=self.gru(transformer_outputs)
         avg_outputs = self.pool(transformer_outputs.transpose(1,2)).squeeze()
 
-        linear_pre2_outputs = self.lrelu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_outputs)))
-        linear_pre1_outputs = self.lrelu1(self.bn_pre1_classifier(self.linear_pre1_classifier(linear_pre2_outputs)))
+        linear_pre2_outputs = self.relu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_outputs)))
+        linear_pre1_outputs = self.relu1(self.bn_pre1_classifier(self.linear_pre1_classifier(linear_pre2_outputs)))
 
         #outputs=self.dropout(self.relu(self.linear_hidden(outputs))) #.transpose(1,2)
         #outputs=F.adaptive_avg_pool1d(hidden_linear,1).squeeze()
@@ -77,3 +84,5 @@ class PositionalEncoding(nn.Module):
         pos_embedding=self.pos_embed(seq_pos).to(self.device)
         x = x + pos_embedding
         return x
+
+

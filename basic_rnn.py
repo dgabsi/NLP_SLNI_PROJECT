@@ -5,8 +5,12 @@ import torch.nn.functional as F
 import params
 
 class Basic_RNN(nn.Module):
+    '''
+    Basic RNN model. Based on bidirectional lstm, topped Adaptive pooling to averages the sequence results and
+     2 linear layers with LeakyRelu activations and batchNorm, output is logits with number of classes
+    '''
 
-    def __init__(self, vocab, device, num_classes=3, hidden_size=512, embeddings_dim=300, hidden_pre2_classifier_linear_dim=256,  hidden_pre1_classifier_linear_dim=64, use_pretrained_embeddings=False, pad_token='<pad>',dropout_rate=0.1):
+    def __init__(self, vocab, device, num_classes=3, hidden_size=512, embeddings_dim=300, hidden_pre2_classifier_linear_dim=256,  hidden_pre1_classifier_linear_dim=64, use_pretrained_embeddings=True, pad_token='<pad>',dropout_rate=0.1):
 
         super(Basic_RNN, self).__init__()
 
@@ -26,14 +30,15 @@ class Basic_RNN(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
 
         self.lstm=nn.LSTM(input_size=self.embedding_size, hidden_size=self.hidden_size, bidirectional=True, batch_first=True, num_layers=2)
+        #Avarage pooling the results
         self.pool = nn.AdaptiveAvgPool1d(1)
 
         self.linear_pre2_classifier = nn.Linear(self.hidden_size * 2, self.hidden_pre2_classifier_linear_dim)
         self.bn_pre2_classifier = nn.BatchNorm1d(self.hidden_pre2_classifier_linear_dim)
-        self.lrelu2=nn.LeakyReLU()
+        self.relu2=nn.ReLU()
         self.linear_pre1_classifier = nn.Linear(self.hidden_pre2_classifier_linear_dim, self.hidden_pre1_classifier_linear_dim)
         self.bn_pre1_classifier = nn.BatchNorm1d(self.hidden_pre1_classifier_linear_dim)
-        self.lrelu1 = nn.LeakyReLU()
+        self.relu1 = nn.ReLU()
         self.classifier=nn.Linear(self.hidden_pre1_classifier_linear_dim, num_classes)
 
     def forward(self, inputs, attention_padding_mask=None):
@@ -44,8 +49,8 @@ class Basic_RNN(nn.Module):
 
         lstm_output, _=self.lstm(embedded_inputs,(init_hidden, init_cell))
         avg_lstm_output = self.pool(lstm_output.transpose(1, 2)).squeeze()
-        pre2_outputs = self.lrelu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_lstm_output)))
-        pre1_outputs = self.lrelu1(self.bn_pre1_classifier(self.linear_pre1_classifier(pre2_outputs)))
+        pre2_outputs = self.relu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_lstm_output)))
+        pre1_outputs = self.relu1(self.bn_pre1_classifier(self.linear_pre1_classifier(pre2_outputs)))
         outputs = self.classifier(pre1_outputs)
 
         return outputs

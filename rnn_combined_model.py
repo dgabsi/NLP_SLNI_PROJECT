@@ -5,8 +5,13 @@ import torch.nn.functional as F
 import params
 
 class RNN_Combined_Model(nn.Module):
+    '''
+    RNN Combined model . Two bidirectional LSTM each for different sentences, each followed by linear layer and and attention matmul
+    and softmax. The outputs are then concatenated and followed by linear layer and Adaptive pooling
+    to averages the sequence results and 2 linear layers with LeakyRelu activations and batchNorm, output is logits with number of classes
+    '''
 
-    def __init__(self, vocab, device, num_classes=3, hidden_size=512, attention_dim=256, embeddings_dim=300, linear_pre_1dim=32, linear_pre_2dim=64, pad_token='<pad>', use_pretrained_embeddings=False, dropout_rate=0.1):
+    def __init__(self, vocab, device, num_classes=3, hidden_size=512, attention_dim=256, embeddings_dim=300, linear_pre_1dim=32, linear_pre_2dim=64, pad_token='<pad>', use_pretrained_embeddings=True, dropout_rate=0.1):
 
         super(RNN_Combined_Model, self).__init__()
 
@@ -38,10 +43,10 @@ class RNN_Combined_Model(nn.Module):
 
         self.linear_pre2_classifier=nn.Linear(attention_dim,linear_pre_2dim)
         self.bn_pre2_classifier=nn.BatchNorm1d(linear_pre_2dim)
-        self.lrelu2 = nn.LeakyReLU()
+        self.relu2 = nn.ReLU()
         self.linear_pre1_classifier=nn.Linear(linear_pre_2dim, linear_pre_1dim)
         self.bn_pre1_classifier = nn.BatchNorm1d(linear_pre_1dim)
-        self.lrelu1 = nn.LeakyReLU()
+        self.relu1 = nn.ReLU()
         self.classifier=nn.Linear(linear_pre_1dim, num_classes)
 
     def forward(self, inputs_1, inputs_2):
@@ -62,8 +67,8 @@ class RNN_Combined_Model(nn.Module):
         linear_outputs=self.linear_combined(concat_outputs)
         avg_outputs = self.pool(linear_outputs.transpose(1, 2)).squeeze()+self.pool1(linear_outputs.transpose(1, 2)).squeeze()
 
-        linear_pre2_outputs=self.lrelu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_outputs)))
-        linear_pre1_outputs = self.lrelu1(self.bn_pre1_classifier(self.linear_pre1_classifier(linear_pre2_outputs)))
+        linear_pre2_outputs=self.relu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_outputs)))
+        linear_pre1_outputs = self.relu1(self.bn_pre1_classifier(self.linear_pre1_classifier(linear_pre2_outputs)))
         outputs=self.classifier(linear_pre1_outputs)
 
         return outputs

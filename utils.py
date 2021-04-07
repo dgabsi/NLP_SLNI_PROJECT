@@ -77,17 +77,17 @@ def report_result(y_predicted,y_true,model_name,labels, title):
     """
     print("{} classifer".format(model_name))
     print("Accuracy: {:.3f}".format(accuracy_score(y_true, y_predicted)))
-    print(classification_report(y_true, y_predicted, labels=labels))
-    cm = confusion_matrix(y_true, y_predicted, labels=labels)
+    print(classification_report(y_true, y_predicted, target_names=labels))
+    cm = confusion_matrix(y_true, y_predicted, labels=np.arange(len(labels)))
     print("Confusion matrix:\n{}".format(cm))
     img = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-    figure, axes = plt.subplots(figsize=(10, 10))
+    figure, axes = plt.subplots(figsize=(5, 5))
     img.plot(ax=axes, xticks_rotation='vertical')
     axes.set_title(title)
     plt.show()
 
-def plot_experiments(plot_file_path, df_results):
-    fig, axes = plt.subplots(1, 3, figsize=(15, 10))
+def plot_experiments(plot_file_path, df_results, title=''):
+    fig, axes = plt.subplots(1, 3, figsize=(15, 8))
     plot_file = plot_file_path
     for run_name in pd.unique(df_results["run_name"]):
         accuracy_data = df_results.loc[df_results["run_name"] == run_name, ["epochs", "val_accuracy"]].sort_values(by=["epochs"])
@@ -109,9 +109,9 @@ def plot_experiments(plot_file_path, df_results):
     axes[0].legend()
     axes[1].legend()
     axes[2].legend()
-    axes[0].set_title('Validation accuracy of experiments')
-    axes[1].set_title('Validation loss of experiments')
-    axes[2].set_title('Train loss of experiments')
+    axes[0].set_title(title+'Validation accuracy of experiments')
+    axes[1].set_title(title+'Validation loss of experiments')
+    axes[2].set_title(title+'Train loss of experiments')
     plt.show()
     fig.savefig(plot_file_path, dpi=fig.dpi)
 
@@ -119,6 +119,7 @@ def plot_train_val_loss(saved_dir, df_results):
 
     for run_name in pd.unique(df_results["run_name"]):
         fig, axes = plt.subplots(figsize=(10,10))
+        model_name=pd.unique(df_results["model"])[0]
         plot_file = os.path.join(saved_dir, run_name +'_train_val_loss'+'.png')
         val_loss=df_results.loc[df_results["run_name"]==run_name,["epochs", "val_loss"]].sort_values(by=["epochs"])
         axes.plot(val_loss["epochs"], val_loss["val_loss"], marker='o', linestyle='solid', label='val_loss')
@@ -127,6 +128,6 @@ def plot_train_val_loss(saved_dir, df_results):
         axes.set_xlabel("Epochs")
         axes.set_ylabel("loss")
         axes.legend()
-        axes.set_title('Training and validation loss_'+run_name)
+        axes.set_title('Training and validation loss_'+model_name+'_'+run_name)
         plt.show()
         fig.savefig(plot_file, dpi=fig.dpi)

@@ -22,7 +22,7 @@ class SNLIDataset(data.Dataset):
     This is a dataset class for SLNI 1.0 data.
     The dataset contains pairs of sentences and the label is their inference of types ["neutral", "contradiction", "entailment"]
     Loading the data and process using spacy/Bert tokenizer
-    There are two different sentence construction: once concatentated combined sentence or 2 seperate sentences
+    There are two different sentence construction: once concatenated combined sentence or 2 separate sentences
     '''
 
     #constants
@@ -58,6 +58,7 @@ class SNLIDataset(data.Dataset):
             self.tokenized_datapoints=self.prepare_tokenized_datapoints()
         else:
             self.tokenized_datapoints=utils.load_from_pickle(os.path.join(self.saved_dir, tokenized_datapoints_file))
+
 
         #self.spacy_tokenized_combined_sentences=
         #self.spacy_tokenized_two_sentences=
@@ -133,6 +134,12 @@ class SNLIDataset(data.Dataset):
 
 
     def change_tokenizer_and_vocab(self, tokenizer='bert' ,eng_mode='one_sentence'):
+        '''
+        change tokenizer- Can be of form 'bert or 'spacy'. If spacy the eng structue can be of type one sentence (conctenated sentence) or two sentence structure
+        :param tokenizer: 'bert' or 'spacy'
+        :param eng_mode: 'one_sentence' or 'two_sentence'
+        :return: None
+        '''
         if tokenizer=='spacy':
             self.tokenizer=spacy.load(self.SPACY_TOKENIZER)# get_tokenizer('spacy', language='en')
             self.eng_mode=eng_mode
@@ -144,6 +151,10 @@ class SNLIDataset(data.Dataset):
 
 
     def prepare_tokenized_datapoints(self):
+        '''
+        Tokenize the full dataset according to the inner vocabulary
+        :return: list containing items of structure (tokenized_sentence1,  tokenized_sentence2, label) of the full dataset
+        '''
 
         tokenized_datapoints=[]
         for datapoint in self.datapoints:
@@ -157,13 +168,22 @@ class SNLIDataset(data.Dataset):
         return tokenized_datapoints
 
     def __getitem__(self, idx):
+        '''
+        get an iterm from the dataset. This is essentinal function of the dataset.Run by the dataloader to fetch the item
+        We will fetch a different output depending on the state of the dataset. If it of Bert model it will be fetch untokenized. If spacy it will be fetched already tokenized.
+
+        :param idx: index of the item
+        :return: item that contain sentence 1, sentence 2, label
+        '''
 
         if idx==0:
             self.shuffle_sort_datapoints()
 
         if self.tokenizer_type == 'bert':
+            #Untokenized sentences
             return self.datapoints[idx]
         else:
+            # tokenized spacy sentences
             return self.tokenized_datapoints[idx]
 
 
@@ -186,17 +206,33 @@ class SNLIDataset(data.Dataset):
 
 
     def change_from_external_voc(self, vocab, tokenizer_type, eng_mode):
+        '''
+
+        :param vocab:
+        :param tokenizer_type:
+        :param eng_mode:
+        :return:
+        '''
         self.vocab=vocab
         self.tokenizer_type=tokenizer_type
         self.eng_mode=eng_mode
 
     def collate_fun(self, batch):
+        '''
+        the collate function is run by the dataloader immediately after the data is fetched.We will pad the sequences fetched to the same length,
+        in case of one sentence construction we will add a seperator token and pad the seqnce to the longest lenght in batch
+        in case of two sentences construction, the two sentences are padd to the max lenght constnat value
+        In case of Bert we call the bert tokenizer with the batch of inputs to prepare them for the Bert model
+        :param batch:
+        :return:
+        '''
 
         #print(f"Start collate{time.time()}")
         batch_sentence1 = []
         batch_sentence2 = []
         batch_sentence_combined = []
         batch_labels = []
+        sentence_masks=[]
 
         #Loop through the batch and prepare lists of inputs according to tokenizer type and mode. In case of spacy inputs are already tokenized
         for sentence1, sentence2, label in batch:
@@ -217,15 +253,17 @@ class SNLIDataset(data.Dataset):
 
         #Preparing the batch- Handle padding and  for bert also tokenization
         if self.tokenizer_type=='spacy':
-                if self.eng_mode=='one_sentence':
+                if self.eng_mode=='one_sentence':#Pad the sequence to the length of the longest in batch
                     prepared_batch_sentences= pad_sequence(batch_sentence_combined, batch_first=True, padding_value=self.vocab.stoi[self.PAD_TOKEN])
                     padding_mask=(prepared_batch_sentences==self.vocab.stoi[self.PAD_TOKEN])
-                    prepared_batch = {'inputs':  prepared_batch_sentences, 'labels': torch.stack(batch_labels), 'attention_padding_mask':padding_mask }
+                    prepared_batch = {'inputs': prepared_batch_sentences, 'labels': torch.stack(batch_labels),
+                                      'attention_padding_mask': padding_mask}
                 else:
                     prepared_sentences1 = pad_sequence(batch_sentence1, batch_first=True, padding_value=self.vocab.stoi[self.PAD_TOKEN])
                     prepared_sentences2 = pad_sequence(batch_sentence2, batch_first=True,  padding_value=self.vocab.stoi[self.PAD_TOKEN])
                     prepared_batch = {'inputs_1': prepared_sentences1, 'inputs_2':  prepared_sentences2, 'labels': torch.stack(batch_labels)}
         else:
+            #If Bert call the Bert tokenizer the prepares the batch of inputs to th longest length and add separator and classification tokens and masks
             tokenized_sentences=self.tokenizer(batch_sentence1,batch_sentence2,padding='longest', add_special_tokens=True,return_tensors="pt")
             prepared_batch = {'inputs_ids': tokenized_sentences['input_ids'],
                           'token_type_ids': tokenized_sentences['token_type_ids'],

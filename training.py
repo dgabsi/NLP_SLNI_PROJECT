@@ -13,8 +13,22 @@ import utils
 import time
 import datetime
 import params
+import math
 
 def train_snli(model, train_dataset,val_dataset, device, model_name, config, writer, models_dir, checkpoint_file=None):
+    '''
+    Train model according to configuration. save to checkping and load from is requested. output to tensorboard and history dict
+    :param model:
+    :param train_dataset:
+    :param val_dataset:
+    :param device:
+    :param model_name:  string model name
+    :param config: dictionary of configuration (lr for now)
+    :param writer: tensorboard writer
+    :param models_dir: directory of checkpoints
+    :param checkpoint_file: if not None load model from this file
+    :return:
+    '''
 
 
     train_dataloader_args = {'batch_size': params.BATCH_SIZE, 'shuffle': False, 'collate_fn': train_dataset.collate_fun}
@@ -23,17 +37,22 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
     val_dataloader_args = {'batch_size': params.BATCH_SIZE, 'shuffle': False, 'collate_fn': val_dataset.collate_fun}
     val_dataloader = data.DataLoader(val_dataset, **val_dataloader_args)
 
-    optimizer = optim.Adam(model.parameters(), lr=config['lr'])
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.99)
+    optimizer = optim.Adam(model.parameters(), **config['config_optim'])
+    #scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.99)
 
     criterion = nn.CrossEntropyLoss()
 
     history = {'Epoch': [], 'Train loss': [], 'Val loss':[], 'Val accuracy': [] , 'Train iter':[], 'Val iter':[]}
 
-
+    #For Tensorboard graphs
     train_iter_start = 0
     val_iter_start = 0
     epoch_start=0
+
+    #prev val loss and patience for stopping in case the validation loss deteriorates
+    max_patience = 3
+    prev_val_loss=math.inf
+    patience=0
 
     if checkpoint_file:
         model_state, optimizer_state, epoch_start,train_iter_start, val_iter_start=utils.load_model(models_dir, checkpoint_file)
@@ -83,7 +102,7 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1)
             optimizer.step()
-            scheduler.step() #optimizer.step()
+            #scheduler.step() #optimizer.step()
             epoch_train_loss+=loss.item()
             num_iters_train+=1
 
@@ -128,19 +147,17 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
             val_corrects += val_batch_correct
 
             num_iters_val += 1
-            #example_inputs=inputs[-1, :].unsqueeze(dim=0)
-            #example_attention_padding_mas = inputs[-1, :].unsqueeze(dim=0)
-            #example_token_type_ids = inputs[-1, :].unsqueeze(dim=0)
 
+
+            #Tensodrboard outputs
             writer.add_scalar('Validation running loss', loss.item(), num_iters_val+val_iter_start)
             writer.add_scalar('Validation running accuracy', val_batch_correct*100/batch_size, num_iters_val+val_iter_start)
 
-            #print(f"Batch{val_batch}/{epoch} Val loss: {loss.item():.2f}")
-            #F.log_softmax(pred_output_logits, dim=2)
 
         #print(dataset.tokenizer.decode(example_inputs))
         #print(model(example_inputs,example_attention_padding_mas,example_token_type_ids))
         #print(evaluation.generate_response(model, 'sotuser I need a train from cambridge to norwich please. eotuser', vocab, device))
+
         epoch_val_loss = epoch_val_loss / len(val_dataloader)
         epoch_val_accuracy = (val_corrects * 100. / len(val_dataset))
 
@@ -152,6 +169,7 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
         writer.add_scalar('Validation loss', epoch_val_loss, epoch+epoch_start)
         writer.add_scalar('Val accuracy', epoch_val_accuracy, epoch+epoch_start)
 
+        #Appedn results to history dict
         history['Epoch'].append(epoch+epoch_start)
         history['Train loss'].append(epoch_train_loss)
         history['Val loss'].append(epoch_val_loss)
@@ -159,10 +177,18 @@ def train_snli(model, train_dataset,val_dataset, device, model_name, config, wri
         history['Train iter'].append(train_iter_start+num_iters_train)
         history['Val iter'].append(val_iter_start+num_iters_val)
 
-
+        #Save checkpint for each epoch
         date_str = datetime.datetime.now().strftime("%m%d%Y %H")
         file_name = model_name+ config['run_name']+' ' +' epoch:'+str(epoch+epoch_start)+' train_iter:'+str(train_iter_start+num_iters_train)+' val_iter:'+str(val_iter_start+num_iters_val)+date_str
         utils.save_model(model, optimizer, models_dir, file_name, epoch+epoch_start, train_iter_start+num_iters_train, val_iter_start+num_iters_val )
+
+        #Early stopping functionality
+        if prev_val_loss<epoch_val_loss:
+            patience+=1
+        prev_val_loss=epoch_val_loss
+        if patience>max_patience:
+            print(f"Validation loss has not decreased in more than {max_patience} episodes! Stopping training! ")
+            break
 
 
     return history
