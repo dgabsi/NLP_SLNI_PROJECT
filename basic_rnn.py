@@ -24,6 +24,7 @@ class Basic_RNN(nn.Module):
 
         self.embedding = nn.Embedding(self.vocabulary_size, self.embedding_size, padding_idx=vocab.stoi[pad_token])
 
+        #Use of pretrained embeddings
         if use_pretrained_embeddings:
             self.embedding.from_pretrained(vocab.vectors, freeze=False, padding_idx=vocab.stoi[pad_token])
 
@@ -47,10 +48,16 @@ class Basic_RNN(nn.Module):
         init_hidden, init_cell= self.init_hidden_and_cell(batch_size)
         embedded_inputs = self.dropout(self.embedding(inputs))
 
+        #bidirectinal lstm on the concatentaed  sentence
         lstm_output, _=self.lstm(embedded_inputs,(init_hidden, init_cell))
+
+        # adaptive avarage pooling for to compress the sequence dim and prepare for classification
         avg_lstm_output = self.pool(lstm_output.transpose(1, 2)).squeeze()
+
+        #Linear layers for preparation to classification
         pre2_outputs = self.relu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_lstm_output)))
         pre1_outputs = self.relu1(self.bn_pre1_classifier(self.linear_pre1_classifier(pre2_outputs)))
+        #final classifier
         outputs = self.classifier(pre1_outputs)
 
         return outputs

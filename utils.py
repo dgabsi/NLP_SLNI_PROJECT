@@ -13,6 +13,17 @@ from sklearn.metrics import accuracy_score
 
 
 def save_model(model, optimizer, models_dir, file_name, epoch_end, train_end_step, val_end_step):
+    '''
+    Save model checkpoint
+    :param model:
+    :param optimizer:
+    :param models_dir:
+    :param file_name:
+    :param epoch_end:
+    :param train_end_step:
+    :param val_end_step:
+    :return:
+    '''
 
     filename=os.path.join(models_dir, file_name + '.pth')
 
@@ -28,6 +39,12 @@ def save_model(model, optimizer, models_dir, file_name, epoch_end, train_end_ste
 
 
 def load_model(models_dir,file_name):
+    '''
+    Load  model checkpoint
+    :param models_dir:
+    :param file_name:
+    :return:
+    '''
 
     filename = os.path.join(models_dir,file_name)
     checkpoint = torch.load(filename)
@@ -41,35 +58,26 @@ def load_model(models_dir,file_name):
 
 
 def save_to_pickle(entity, file):
+    '''
+    Save to pickle file
+    :param entity:
+    :param file:
+    :return:
+    '''
     with open(file, 'wb') as file:
         pickle.dump(entity, file)
     file.close()
 
 def load_from_pickle(file):
+    '''
+    Load from pickle
+    '''
+
     with open(file, 'rb') as file:
         entity = pickle.loads(file.read())
     file.close()
     return entity
 
-'''
-def plot_all_experiments(df_results, plot_file):
-    plot_file = os.path.join(models_dir, plot_file + '.png')
-
-    run_types=df_results["run_name"].unique()
-    fig = plt.figure()
-    for ind, _ in enumerate(run_types):
-        
-        plt.plot(range(len(list_all_total_mean[ind])), list_all_total_mean[ind], label=labels[ind])
-        plt.fill_between(range(len(list_all_total_mean[ind])), list_all_total_mean[ind] - list_all_total_std[ind] / 2,
-                         list_all_total_mean[ind] + list_all_total_std[ind] / 2, color='red', alpha=0.2)
-
-    plt.xlabel('Episodes')
-    plt.ylabel(y_labels)
-    plt.legend()
-    plt.title(title)
-    plt.savefig(plot_file, dpi=fig.dpi)
-    plt.show()
-'''
 
 def report_result(y_predicted,y_true,model_name,labels, title):
     """"
@@ -86,7 +94,15 @@ def report_result(y_predicted,y_true,model_name,labels, title):
     axes.set_title(title)
     plt.show()
 
+
 def plot_experiments(plot_file_path, df_results, title=''):
+    '''
+    Plot experiments (accuracy rate, train and val loss) in a line plot
+    :param plot_file_path:
+    :param df_results:
+    :param title:
+    :return:
+    '''
     fig, axes = plt.subplots(1, 3, figsize=(15, 8))
     plot_file = plot_file_path
     for run_name in pd.unique(df_results["run_name"]):
@@ -116,6 +132,12 @@ def plot_experiments(plot_file_path, df_results, title=''):
     fig.savefig(plot_file_path, dpi=fig.dpi)
 
 def plot_train_val_loss(saved_dir, df_results):
+    '''
+    Plot train versus validation loss in a line plot
+    :param saved_dir:
+    :param df_results:
+    :return:
+    '''
 
     for run_name in pd.unique(df_results["run_name"]):
         fig, axes = plt.subplots(figsize=(10,10))

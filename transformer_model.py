@@ -33,7 +33,7 @@ class SNLI_Transformer(nn.Module):
 
         self.transformer = nn.TransformerEncoder(self.transformer_encoder_layer, num_enc_layers)
         self.pool = nn.AdaptiveAvgPool1d(1)
-        #self.gru=nn.GRU(self.embedding_size, hidden_size=200, batch_first=True, bidirectional=True)
+
 
         self.linear_pre2_classifier=nn.Linear(self.embedding_size,self.hidden_pre2_classifier_linear_dim)
         self.bn_pre2_classifier = nn.BatchNorm1d(self.hidden_pre2_classifier_linear_dim)
@@ -46,27 +46,25 @@ class SNLI_Transformer(nn.Module):
 
     def forward(self, inputs, attention_padding_mask):
 
-        batch_size=inputs.size(0)
-        #print(self.positional_encoding(inputs.size(1)).expand(batch_size, -1, -1).size())
+        #batch_size=inputs.size(0)
+
         embedded_inputs=self.embedding(inputs)
         embedded_inputs=self.dropout(self.pos_encoder(embedded_inputs))
 
-
-        #embedded_inputs=embedded_inputs+sentences_mask
-        #embedded_inputs=self.pos_encoder(embedded_inputs)
-        #embedded_inputs=self.dropout(self.embedding(inputs)+self.positional_encoding(inputs.size(1)).expand(batch_size, -1, -1))
+        #Prepare for trasformer- we need to change 0, 1 dimensions
         embedded_inputs=embedded_inputs.transpose(0,1)
 
         transformer_outputs=self.transformer(embedded_inputs,src_key_padding_mask=attention_padding_mask)
+        #Going back to the original order
         transformer_outputs=transformer_outputs.transpose(0,1)
-        #gru_outputs, _=self.gru(transformer_outputs)
+
+        # adaptive avarage pooling for to compress the sequence dim and prepare for classification
         avg_outputs = self.pool(transformer_outputs.transpose(1,2)).squeeze()
 
+        #final linear classification layers
         linear_pre2_outputs = self.relu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_outputs)))
         linear_pre1_outputs = self.relu1(self.bn_pre1_classifier(self.linear_pre1_classifier(linear_pre2_outputs)))
 
-        #outputs=self.dropout(self.relu(self.linear_hidden(outputs))) #.transpose(1,2)
-        #outputs=F.adaptive_avg_pool1d(hidden_linear,1).squeeze()
         outputs = self.classifier(linear_pre1_outputs)
 
         return outputs
@@ -74,6 +72,9 @@ class SNLI_Transformer(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
+    '''
+    Positional encoding as embeddings
+    '''
 
     def __init__(self, device, embedding_size, max_len=1000):
         super(PositionalEncoding, self).__init__()

@@ -12,14 +12,12 @@ class BertTransformer(nn.Module):
 
         super().__init__()
 
+        #create the bert classification model from huggingface
         self.bert_model_backbone = transformers.BertForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=num_classes, output_attentions=True, output_hidden_states=False)
-        #self.gru=nn.GRU()
+
 
     def forward(self, inputs_ids, attention_mask, token_type_ids, return_attention=False):
 
-        #print(inputs)
-        #print(token_type_ids)
-        #print(attention_mask)
         output=self.bert_model_backbone(input_ids=inputs_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
         logits=output.logits
         attentions=output.attentions

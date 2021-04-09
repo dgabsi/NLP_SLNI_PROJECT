@@ -24,9 +24,9 @@ def run_training_by_config(model, train_dataset, val_dataset, device, model_name
     :param train_dataset:
     :param val_dataset:
     :param device:
-    :param model_name: string- name of modle
+    :param model_name: string- name of model
     :param config_dict: dictionary of configuration
-    :param results_dict: reults dictinary to report episodes results
+    :param results_dict: results dictionary to report episodes results
     :return: return results_dict (now appended with current configuration results
     '''
 

@@ -52,21 +52,28 @@ class RNN_Combined_Model(nn.Module):
     def forward(self, inputs_1, inputs_2):
         sentence1_embedded=self.sentence1_dropout(self.sentence1_embedding(inputs_1))
         sentence2_embedded = self.sentence2_dropout(self.sentence2_embedding(inputs_2))
+
+        #bidirectinal lstm for each sentence
         sentence1_lstm_outputs,_=self.sentence1_lstm(sentence1_embedded)
         sentence2_lstm_outputs,_ = self.sentence2_lstm(sentence2_embedded)
 
+        #linear layer for each sentence-for preparation before attention -brining both to the same dim and further transformation
         linear_sentence1 = self.linear_sentence1(sentence1_lstm_outputs)
 
         linear_sentence2 = self.linear_sentence1(sentence2_lstm_outputs)
+
+        #Attention mechanism
         first_bmm = linear_sentence2.bmm(linear_sentence1.transpose(1, 2))
-       # scores=F.softmax(first_bmm/(linear_sentence1.size(2)**0.5), dim=2)
         scores = F.softmax(first_bmm/(linear_sentence1.size(2)**0.5) , dim=2)
         attention_values=scores.bmm(linear_sentence1)
 
+        #residual connection with the inputs before attention
         concat_outputs=torch.cat(( linear_sentence1, linear_sentence2, attention_values), dim=-1)
+        #further linear and adaptive avarage pooling for to compress the sequence dim and prepare for classification
         linear_outputs=self.linear_combined(concat_outputs)
         avg_outputs = self.pool(linear_outputs.transpose(1, 2)).squeeze()+self.pool1(linear_outputs.transpose(1, 2)).squeeze()
 
+        #Final classification linear layers
         linear_pre2_outputs=self.relu2(self.bn_pre2_classifier(self.linear_pre2_classifier(avg_outputs)))
         linear_pre1_outputs = self.relu1(self.bn_pre1_classifier(self.linear_pre1_classifier(linear_pre2_outputs)))
         outputs=self.classifier(linear_pre1_outputs)
