@@ -27,7 +27,7 @@ Project structure:
 - data (Directory for data)
   - slni_1.0 (The dataset json files)
 - experiments (Directory for Tensorboard logs)
-- saved_models (Directory for saved models, pickles and visualization results charts)
+- saved_models (Directory for saved models, pickles and visualization results charts- PLEASE do not delete)
   -best_models
 -  slni 
     - __init__.py 
