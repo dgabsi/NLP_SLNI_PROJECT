@@ -19,6 +19,11 @@ build during its construction.
 I have also used TensorBoard for following the training.
 
 
+##Very Important: Due to the size of data, I have put the data files in OneDrive.
+In One Drive please take contents of For706coursework and put under the directory saved_models
+https://cityuni-my.sharepoint.com/personal/daniela_stern-gabsi_city_ac_uk/_layouts/15/onedrive.aspx?id=%2Fpersonal%2Fdaniela%5Fstern%2Dgabsi%5Fcity%5Fac%5Fuk%2FDocuments%2FFor706coursework
+
+
 Main notebook:
 **SLNI_706project.ipynb** 
 
@@ -27,21 +32,21 @@ Project structure:
 - data (Directory for data)
   - slni_1.0 (The dataset json files)
 - experiments (Directory for Tensorboard logs)
-- saved_models (Directory for saved models, pickles and visualization results charts- PLEASE do not delete)
-  -best_models
--  slni 
-    - __init__.py 
-    - basic_rnn.py 
-    - bert_model.py
-    - rnn_combined_model.py
-    - transformer_model.py
-    - slni_dataset.py  (Dataset)
-    - utils.py 
-    - main_slni.py 
-    - training.py (training function. Serves all networks)
-    - evaluation.py 
-    - params.py
-    - SLNI_706project.ipynb (**this is the main notebook that should be used**)
+- saved_models (Directory for saved models, pickles and visualization results charts- **models from drive should be put directly here**)
+   - saved
+- results
+- basic_rnn.py 
+- bert_model.py
+- rnn_combined_model.py
+- rnn_combined_model.py
+- transformer_model.py
+- slni_dataset.py  (Dataset)
+- utils.py 
+- main_slni.py 
+- training.py (training function. Serves all networks)
+- evaluation.py 
+- params.py
+- SLNI_706project.ipynb (**this is the main notebook that should be used**)
 
 packages needed :
 - torch 1.8.0 (I used with cu111)
